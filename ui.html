@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MNIST Digit Classifier</title>
+<style>
+  :root {
+    --bg: #0e0e0f;
+    --surface: #181819;
+    --border: #2a2a2d;
+    --border-hi: #3d3d42;
+    --text: #e8e8ea;
+    --muted: #6b6b72;
+    --accent: #4f8ef7;
+    --accent-dim: #1e3560;
+    --success: #3ecf6e;
+    --mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px 60px;
+  }
+
+  header {
+    width: 100%;
+    max-width: 760px;
+    margin-bottom: 32px;
+    border-bottom: 0.5px solid var(--border);
+    padding-bottom: 16px;
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+  }
+
+  header h1 {
+    font-size: 15px;
+    font-weight: 500;
+    letter-spacing: .04em;
+    color: var(--text);
+  }
+
+  header .tag {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: .06em;
+  }
+
+  .server-row {
+    width: 100%;
+    max-width: 760px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 24px;
+  }
+
+  .server-row label { font-size: 11px; color: var(--muted); white-space: nowrap; }
+
+  .server-row input {
+    flex: 1;
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 6px 10px;
+    outline: none;
+    transition: border-color .15s;
+  }
+  .server-row input:focus { border-color: var(--accent); }
+
+  .dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--border);
+    flex-shrink: 0;
+    transition: background .3s;
+  }
+  .dot.ok  { background: var(--success); box-shadow: 0 0 6px var(--success); }
+  .dot.err { background: #e05252; }
+  .dot.checking { background: var(--accent); animation: pulse 1s infinite; }
+
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+  .layout {
+    width: 100%;
+    max-width: 760px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+
+  .panel {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: 12px;
+    padding: 18px;
+  }
+
+  .panel-label {
+    font-size: 10px;
+    letter-spacing: .1em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  canvas#draw-canvas {
+    display: block;
+    width: 100%;
+    aspect-ratio: 1;
+    background: #000;
+    border-radius: 8px;
+    cursor: crosshair;
+    touch-action: none;
+    image-rendering: pixelated;
+    border: 0.5px solid var(--border-hi);
+  }
+
+  .btn-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  button {
+    flex: 1;
+    padding: 9px 0;
+    font-family: var(--mono);
+    font-size: 12px;
+    border-radius: 6px;
+    border: 0.5px solid var(--border-hi);
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all .15s;
+    letter-spacing: .03em;
+  }
+  button:hover  { background: #222; color: var(--text); border-color: var(--border-hi); }
+  button:active { transform: scale(.97); }
+
+  #classify-btn {
+    border-color: var(--accent-dim);
+    color: var(--accent);
+  }
+  #classify-btn:hover { background: var(--accent-dim); }
+  #classify-btn:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+
+  .status-line {
+    margin-top: 10px;
+    font-size: 11px;
+    color: var(--muted);
+    min-height: 16px;
+    transition: color .2s;
+  }
+  .status-line.active { color: var(--accent); }
+  .status-line.done   { color: var(--success); }
+  .status-line.error  { color: #e05252; }
+
+  .result-hero {
+    text-align: center;
+    padding: 10px 0 6px;
+  }
+  .result-hero .digit {
+    font-size: 72px;
+    font-weight: 500;
+    color: var(--text);
+    line-height: 1;
+    letter-spacing: -4px;
+    transition: all .25s cubic-bezier(.4,0,.2,1);
+  }
+  .result-hero .conf {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  .bars { display: flex; flex-direction: column; gap: 6px; }
+
+  .bar-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .bar-idx {
+    font-size: 11px;
+    color: var(--muted);
+    width: 10px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+  .bar-track {
+    flex: 1;
+    height: 5px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--muted);
+    border-radius: 3px;
+    transition: width .35s cubic-bezier(.4,0,.2,1), background .25s;
+  }
+  .bar-fill.top { background: var(--accent); }
+  .bar-pct {
+    font-size: 10px;
+    color: var(--muted);
+    width: 36px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  .preview-row {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 0.5px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  canvas#preview-canvas {
+    image-rendering: pixelated;
+    border: 0.5px solid var(--border-hi);
+    border-radius: 4px;
+    flex-shrink: 0;
+    width: 56px;
+    height: 56px;
+  }
+  .preview-meta {
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+  }
+
+  @media (max-width: 520px) {
+    .layout { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>mnist digit classifier</h1>
+  <span class="tag">feedforward nn · pytorch → onnx → flask</span>
+</header>
+
+<div class="server-row">
+  <label>server</label>
+  <input id="server-url" type="text" value="http://localhost:5000" spellcheck="false">
+  <div class="dot" id="conn-dot" title="connection status"></div>
+</div>
+
+<div class="layout">
+  <!-- Left: drawing canvas -->
+  <div>
+    <div class="panel">
+      <div class="panel-label">draw a digit</div>
+      <canvas id="draw-canvas" width="280" height="280"></canvas>
+      <div class="btn-row">
+        <button id="clear-btn">clear</button>
+        <button id="classify-btn">classify →</button>
+      </div>
+      <div class="status-line" id="status">connect to your Flask server, then draw a digit</div>
+    </div>
+  </div>
+
+  <!-- Right: results -->
+  <div style="display:flex;flex-direction:column;gap:16px">
+    <div class="panel" style="flex:0 0 auto">
+      <div class="panel-label">prediction</div>
+      <div class="result-hero">
+        <div class="digit" id="result-digit">—</div>
+        <div class="conf" id="result-conf">confidence: —</div>
+      </div>
+    </div>
+
+    <div class="panel" style="flex:1">
+      <div class="panel-label">class probabilities</div>
+      <div class="bars" id="bars-container"></div>
+
+      <div class="preview-row">
+        <canvas id="preview-canvas" width="28" height="28"></canvas>
+        <div class="preview-meta" id="preview-meta">
+          28 × 28 px<br>
+          normalised input<br>
+          shown after classify
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const DRAW_SIZE    = 280;
+const MODEL_SIZE   = 28;
+const BRUSH_RADIUS = 14;
+const MEAN = 0.1307, STD = 0.3081;
+
+const drawCanvas   = document.getElementById('draw-canvas');
+const dctx         = drawCanvas.getContext('2d');
+const previewCanvas= document.getElementById('preview-canvas');
+const pctx         = previewCanvas.getContext('2d');
+const statusEl     = document.getElementById('status');
+const resultDigit  = document.getElementById('result-digit');
+const resultConf   = document.getElementById('result-conf');
+const barsContainer= document.getElementById('bars-container');
+const serverInput  = document.getElementById('server-url');
+const connDot      = document.getElementById('conn-dot');
+const classifyBtn  = document.getElementById('classify-btn');
+const clearBtn     = document.getElementById('clear-btn');
+const previewMeta  = document.getElementById('preview-meta');
+
+dctx.fillStyle = '#000';
+dctx.fillRect(0, 0, DRAW_SIZE, DRAW_SIZE);
+
+for (let i = 0; i < 10; i++) {
+  const row = document.createElement('div');
+  row.className = 'bar-row';
+  row.innerHTML = `
+    <span class="bar-idx">${i}</span>
+    <div class="bar-track"><div class="bar-fill" id="bf${i}"></div></div>
+    <span class="bar-pct" id="bp${i}">—</span>`;
+  barsContainer.appendChild(row);
+}
+
+let drawing = false, hasMark = false, lastX = 0, lastY = 0;
+
+function getPos(e) {
+  const r = drawCanvas.getBoundingClientRect();
+  const sx = DRAW_SIZE / r.width, sy = DRAW_SIZE / r.height;
+  const src = e.touches ? e.touches[0] : e;
+  return [(src.clientX - r.left) * sx, (src.clientY - r.top) * sy];
+}
+
+function drawStroke(x0, y0, x1, y1) {
+  dctx.strokeStyle = '#fff';
+  dctx.lineWidth   = BRUSH_RADIUS * 2;
+  dctx.lineCap     = 'round';
+  dctx.lineJoin    = 'round';
+  dctx.beginPath();
+  dctx.moveTo(x0, y0);
+  dctx.lineTo(x1, y1);
+  dctx.stroke();
+}
+
+drawCanvas.addEventListener('mousedown',  e => { drawing = true; hasMark = true; [lastX, lastY] = getPos(e); });
+drawCanvas.addEventListener('mousemove',  e => { if (!drawing) return; const [x, y] = getPos(e); drawStroke(lastX, lastY, x, y); [lastX, lastY] = [x, y]; });
+drawCanvas.addEventListener('mouseup',    () => drawing = false);
+drawCanvas.addEventListener('mouseleave', () => drawing = false);
+
+drawCanvas.addEventListener('touchstart',  e => { e.preventDefault(); drawing = true; hasMark = true; [lastX, lastY] = getPos(e); }, { passive: false });
+drawCanvas.addEventListener('touchmove',   e => { e.preventDefault(); if (!drawing) return; const [x, y] = getPos(e); drawStroke(lastX, lastY, x, y); [lastX, lastY] = [x, y]; }, { passive: false });
+drawCanvas.addEventListener('touchend',    () => drawing = false);
+
+clearBtn.addEventListener('click', () => {
+  dctx.fillStyle = '#000';
+  dctx.fillRect(0, 0, DRAW_SIZE, DRAW_SIZE);
+  pctx.fillStyle = '#000';
+  pctx.fillRect(0, 0, MODEL_SIZE, MODEL_SIZE);
+  hasMark = false;
+  resultDigit.textContent = '—';
+  resultConf.textContent  = 'confidence: —';
+  for (let i = 0; i < 10; i++) {
+    document.getElementById('bf' + i).style.width = '0%';
+    document.getElementById('bf' + i).classList.remove('top');
+    document.getElementById('bp' + i).textContent = '—';
+  }
+  previewMeta.innerHTML = '28 × 28 px<br>normalised input<br>shown after classify';
+  setStatus('canvas cleared', '');
+});
+
+let healthTimer = null;
+
+function serverURL() { return serverInput.value.replace(/\/$/, ''); }
+
+async function checkHealth() {
+  connDot.className = 'dot checking';
+  try {
+    const r = await fetch(serverURL() + '/health', { signal: AbortSignal.timeout(2000) });
+    if (r.ok) { connDot.className = 'dot ok'; return true; }
+    connDot.className = 'dot err'; return false;
+  } catch {
+    connDot.className = 'dot err'; return false;
+  }
+}
+
+serverInput.addEventListener('input', () => {
+  clearTimeout(healthTimer);
+  healthTimer = setTimeout(checkHealth, 600);
+});
+
+checkHealth();
+setInterval(checkHealth, 8000);
+
+function setStatus(msg, cls = '') {
+  statusEl.textContent = msg;
+  statusEl.className   = 'status-line' + (cls ? ' ' + cls : '');
+}
+
+classifyBtn.addEventListener('click', async () => {
+  if (!hasMark) { setStatus('draw a digit first', 'error'); return; }
+
+  setStatus('preprocessing…', 'active');
+  classifyBtn.disabled = true;
+
+  const tmp   = document.createElement('canvas');
+  tmp.width   = MODEL_SIZE; tmp.height = MODEL_SIZE;
+  const tc    = tmp.getContext('2d');
+  tc.drawImage(drawCanvas, 0, 0, MODEL_SIZE, MODEL_SIZE);
+  const imgData = tc.getImageData(0, 0, MODEL_SIZE, MODEL_SIZE);
+
+  pctx.putImageData(imgData, 0, 0);
+
+  const pixels = [];
+  for (let i = 0; i < MODEL_SIZE * MODEL_SIZE; i++) {
+    pixels.push(imgData.data[i * 4] / 255);
+  }
+
+  const nonzero = pixels.filter(v => v > 0.05).length;
+  previewMeta.innerHTML = `28 × 28 px input<br>${nonzero} active pixels<br>normalised μ=0.1307 σ=0.3081`;
+
+  setStatus('sending to Flask server…', 'active');
+
+  try {
+    const res = await fetch(serverURL() + '/predict', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pixels }),
+      signal: AbortSignal.timeout(5000),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(err.error || res.statusText);
+    }
+
+    const data = await res.json();
+    const { prediction, confidence, probabilities } = data;
+
+    resultDigit.textContent = prediction;
+    resultConf.textContent  = `confidence: ${(confidence * 100).toFixed(1)}%`;
+
+    for (let i = 0; i < 10; i++) {
+      const pct = (probabilities[i] * 100).toFixed(1);
+      const fill = document.getElementById('bf' + i);
+      fill.style.width = pct + '%';
+      fill.classList.toggle('top', i === prediction);
+      document.getElementById('bp' + i).textContent = pct + '%';
+    }
+
+    setStatus(`prediction: ${prediction}  ·  confidence: ${(confidence * 100).toFixed(1)}%`, 'done');
+
+  } catch (err) {
+    setStatus('error: ' + err.message, 'error');
+    connDot.className = 'dot err';
+  } finally {
+    classifyBtn.disabled = false;
+  }
+});
+</script>
+</body>
+</html>
