@@ -13,7 +13,7 @@ Requirements: Pytorch, Onnx, Flask, Numpy, Matplotlib, Pillow<br>
 1. Install dependencies
 2. Set environment variables: <br>
 ```
-ENV HOST=0.0.0.0`
+ENV HOST=0.0.0.0
 ENV PORT=5000
 ```
 3. Start server: <br>
