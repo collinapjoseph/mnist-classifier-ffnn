@@ -1,6 +1,7 @@
 # Feedforward Neural Network MNIST Classifier
+I developed this project as an exercise in using AI-assisted coding and docker/dockerhub.<br>
 Generated using Claude Sonnet 4.6<br>
-
+Can be deployed using Docker or directly by installing required libraries. <br>
 Requirements: Pytorch, Onnx, Flask, Numpy, Matplotlib, Pillow<br>
 
 **TO RUN:**<br>
